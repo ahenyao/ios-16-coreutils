@@ -1,0 +1,96 @@
+
+name: Build iOS Coreutils
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ARM64 iOS Coreutils
+    runs-on: macos-15-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          set -euxo pipefail
+
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add aarch64-apple-ios
+
+      - name: Configure iOS SDK
+        run: |
+          set -euxo pipefail
+
+          echo "SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)" >> "$GITHUB_ENV"
+          echo "IPHONEOS_DEPLOYMENT_TARGET=16.0" >> "$GITHUB_ENV"
+
+      - name: Clone uutils Coreutils
+        run: |
+          set -euxo pipefail
+
+          git clone \
+            --depth 1 \
+            --branch 0.11.0 \
+            https://github.com/uutils/coreutils.git \
+            coreutils
+
+      - name: Build Coreutils
+        run: |
+          set -euxo pipefail
+
+          cd coreutils
+
+          export RUSTFLAGS="-C link-arg=-miphoneos-version-min=16.0"
+
+          cargo build \
+            --locked \
+            --target aarch64-apple-ios \
+            --profile release-small \
+            --features unix
+
+      - name: Collect binary
+        run: |
+          set -euxo pipefail
+
+          mkdir -p dist
+
+          cp \
+            coreutils/target/aarch64-apple-ios/release-small/coreutils \
+            dist/coreutils
+
+          chmod 755 dist/coreutils
+
+      - name: Verify binary
+        run: |
+          set -euxo pipefail
+
+          echo "Checking file type..."
+          file dist/coreutils
+
+          echo "Checking architecture..."
+          lipo -verify_arch arm64 dist/coreutils
+
+          echo "Checking linked libraries..."
+          otool -L dist/coreutils
+
+          echo "Checking binary size..."
+          ls -lh dist/coreutils
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coreutils-ios-arm64
+          path: dist/coreutils
+          if-no-files-found: error
+          retention-days: 30
