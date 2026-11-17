@@ -101,7 +101,7 @@ jobs:
           file dist/coreutils
 
           echo "Checking architecture..."
-          lipo -verify_arch arm64 dist/coreutils
+          lipo dist/coreutils -verify_arch arm64
 
           echo "Checking linked libraries..."
           otool -L dist/coreutils
