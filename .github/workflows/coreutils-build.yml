@@ -45,6 +45,28 @@ jobs:
             https://github.com/uutils/coreutils.git \
             coreutils
 
+            
+      - name: Disable incompatible stdbuf utility
+        run: |
+          set -euxo pipefail
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("coreutils/Cargo.toml")
+          content = path.read_text()
+
+          old = 'feat_require_unix = ["feat_require_unix_core", "stdbuf"]'
+          new = 'feat_require_unix = ["feat_require_unix_core"]'
+
+          if old not in content:
+              raise SystemExit("Could not find expected stdbuf feature declaration")
+
+          path.write_text(content.replace(old, new))
+          print("Disabled stdbuf for iOS")
+          PY
+
+
       - name: Build Coreutils
         run: |
           set -euxo pipefail
